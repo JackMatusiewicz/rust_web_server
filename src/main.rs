@@ -21,7 +21,7 @@ impl ThreadPool {
         for i in 0..number_of_threads {
             let (sender, receiver) = std::sync::mpsc::channel::<WorkItem>();
             let thread = std::thread::spawn(move || {
-                for work_item in receiver {
+                for mut work_item in receiver {
                     println!("Work being done by thread #{}", i);
                     work_item()
                 }
@@ -63,20 +63,24 @@ fn send_response(
     })
 }
 
-fn connect(stream: &mut TcpStream, pool: &mut ThreadPool) -> () {
+fn connect(mut stream: TcpStream, pool: &mut ThreadPool) -> () {
     let mut buf = Box::new([0; 512]);
     let read = stream.read(&mut *buf);
     match read {
         Ok(_size) => {
             let data = String::from_utf8_lossy(&buf[..]);
             if data.starts_with(GET_REQUEST) {
-                let v = Box::new(move || {
-                    send_response("HTTP/1.1 200 OK\r\n\r\n{}", "page.html", stream);
+                let v: Box<dyn FnMut() -> () + Send + Sync> = Box::new(move || {
+                    send_response("HTTP/1.1 200 OK\r\n\r\n{}", "page.html", &mut stream);
                 });
                 pool.execute(v);
             } else {
-                let v = Box::new(move || {
-                    send_response("HTTP/1.1 404 NOT FOUND\r\n\r\n{}", "error.html", stream);
+                let v: Box<dyn FnMut() -> () + Send + Sync> = Box::new(move || {
+                    send_response(
+                        "HTTP/1.1 404 NOT FOUND\r\n\r\n{}",
+                        "error.html",
+                        &mut stream,
+                    );
                 });
                 pool.execute(v);
             }
@@ -88,8 +92,8 @@ fn connect(stream: &mut TcpStream, pool: &mut ThreadPool) -> () {
 fn start(tcp_listener: &TcpListener, pool: &mut ThreadPool) -> ! {
     for stream in tcp_listener.incoming() {
         match stream {
-            Ok(mut stream) => {
-                let _ = connect(&mut stream, pool);
+            Ok(stream) => {
+                let _ = connect(stream, pool);
                 ()
             }
             Err(e) => panic!("{}", e),
