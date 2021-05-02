@@ -71,13 +71,13 @@ fn connect(mut stream: TcpStream, pool: &mut ThreadPool) -> () {
             let data = String::from_utf8_lossy(&buf[..]);
             if data.starts_with(GET_REQUEST) {
                 let v: Box<dyn FnMut() -> () + Send + Sync> = Box::new(move || {
-                    let _ = send_response("HTTP/1.1 200 OK\r\n\r\n{}", "page.html", &mut stream);
+                    let _ = send_response("HTTP/1.1 200 OK\r\n\r\n", "page.html", &mut stream);
                 });
                 pool.execute(v);
             } else {
                 let v: Box<dyn FnMut() -> () + Send + Sync> = Box::new(move || {
                     let _ = send_response(
-                        "HTTP/1.1 404 NOT FOUND\r\n\r\n{}",
+                        "HTTP/1.1 404 NOT FOUND\r\n\r\n",
                         "error.html",
                         &mut stream,
                     );
