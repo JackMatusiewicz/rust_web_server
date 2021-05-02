@@ -5,17 +5,20 @@ use std::net::{TcpListener, TcpStream};
 static GET_REQUEST: &str = "GET / HTTP/1.1\r\n";
 
 type WorkItem = Box<dyn FnMut() -> () + Send + Sync>;
-type ThreadAndChannel = (std::thread::JoinHandle<()>, std::sync::mpsc::Sender<WorkItem>);
+type ThreadAndChannel = (
+    std::thread::JoinHandle<()>,
+    std::sync::mpsc::Sender<WorkItem>,
+);
 
 pub struct ThreadPool {
     threads: Vec<ThreadAndChannel>,
-    next_thread: usize
+    next_thread: usize,
 }
 
 impl ThreadPool {
     pub fn make(number_of_threads: u32) -> ThreadPool {
         let mut v = Vec::<ThreadAndChannel>::new();
-        for i in 0 .. number_of_threads {
+        for i in 0..number_of_threads {
             let (sender, receiver) = std::sync::mpsc::channel::<WorkItem>();
             let thread = std::thread::spawn(move || {
                 for work_item in receiver {
@@ -28,7 +31,7 @@ impl ThreadPool {
 
         ThreadPool {
             threads: v,
-            next_thread:0
+            next_thread: 0,
         }
     }
 
@@ -41,18 +44,22 @@ impl ThreadPool {
                 if self.next_thread >= self.threads.len() {
                     self.next_thread = 0;
                 }
-            },
-            None => panic!("Not reachable")
+            }
+            None => panic!("Not reachable"),
         }
     }
 }
 
-fn send_response(first_line: &str, file: &str, stream: &mut TcpStream) -> std::result::Result<(), std::io::Error> {
+fn send_response(
+    first_line: &str,
+    file: &str,
+    stream: &mut TcpStream,
+) -> std::result::Result<(), std::io::Error> {
     fs::read_to_string(file).and_then(|body: String| {
-        let response = format!("{}{}",first_line, body);
-        stream.write(response.as_bytes()).and_then(|_sent_bytes| {
-            stream.flush()
-        })
+        let response = format!("{}{}", first_line, body);
+        stream
+            .write(response.as_bytes())
+            .and_then(|_sent_bytes| stream.flush())
     })
 }
 
@@ -63,11 +70,14 @@ fn connect(stream: &mut TcpStream, pool: &mut ThreadPool) -> () {
         Ok(_size) => {
             let data = String::from_utf8_lossy(&buf[..]);
             if data.starts_with(GET_REQUEST) {
-                let v = Box::new(move || { send_response("HTTP/1.1 200 OK\r\n\r\n{}", "page.html", stream); });
+                let v = Box::new(move || {
+                    send_response("HTTP/1.1 200 OK\r\n\r\n{}", "page.html", stream);
+                });
                 pool.execute(v);
-            }
-            else {
-                let v = Box::new(move || { send_response("HTTP/1.1 404 NOT FOUND\r\n\r\n{}", "error.html", stream); });
+            } else {
+                let v = Box::new(move || {
+                    send_response("HTTP/1.1 404 NOT FOUND\r\n\r\n{}", "error.html", stream);
+                });
                 pool.execute(v);
             }
         }
@@ -81,7 +91,7 @@ fn start(tcp_listener: &TcpListener, pool: &mut ThreadPool) -> ! {
             Ok(mut stream) => {
                 let _ = connect(&mut stream, pool);
                 ()
-            },
+            }
             Err(e) => panic!("{}", e),
         }
     }
