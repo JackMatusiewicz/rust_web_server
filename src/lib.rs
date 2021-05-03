@@ -1,5 +1,5 @@
 /// A type alias for a mutable closure that can be shared between threads.
-pub type WorkItem = Box<dyn FnOnce() -> () + Send + Sync>;
+pub type WorkItem = Box<dyn FnOnce() -> () + Send>;
 
 /// A type alias for a thread's join handle and the associated channel endpoint (the send) that will allow you to send
 /// work items to the worker thread.
@@ -36,7 +36,7 @@ impl ThreadPool {
     }
 
     /// Takes a work items and sends it to the next worker thread.
-    pub fn execute<F: FnOnce() -> () + Send + Sync + 'static>(&mut self, work_item: F) {
+    pub fn execute<F: FnOnce() -> () + Send + 'static>(&mut self, work_item: F) {
         match self.threads.get(self.next_thread) {
             Some(v) => {
                 let sender = &v.1;
