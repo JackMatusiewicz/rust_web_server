@@ -26,7 +26,7 @@ fn connect(mut stream: TcpStream, pool: &mut ThreadPool) -> () {
             let data = String::from_utf8_lossy(&buf[..]);
             let v: Box<dyn FnMut() -> () + Send + Sync> = if data.starts_with(GET_REQUEST) {
                 Box::new(move || {
-                    std::thread::sleep_ms(5000);
+                    std::thread::sleep(std::time::Duration::from_secs(5));
                     let _ = send_response("HTTP/1.1 200 OK\r\n\r\n", "page.html", &mut stream);
                 })
             } else {
@@ -41,8 +41,9 @@ fn connect(mut stream: TcpStream, pool: &mut ThreadPool) -> () {
     }
 }
 
-fn start(tcp_listener: &TcpListener, pool: &mut ThreadPool) -> ! {
-    for stream in tcp_listener.incoming() {
+fn start(tcp_listener: &TcpListener, pool: &mut ThreadPool) -> () {
+    // The take(2) is only to illustrate the graceful shutdown of the server.
+    for stream in tcp_listener.incoming().take(2) {
         match stream {
             Ok(stream) => {
                 let _ = connect(stream, pool);
@@ -51,7 +52,7 @@ fn start(tcp_listener: &TcpListener, pool: &mut ThreadPool) -> ! {
             Err(e) => panic!("{}", e),
         }
     }
-    panic!("Will never hit");
+    println!("Server shutting down.")
 }
 
 fn main() {
