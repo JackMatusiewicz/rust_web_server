@@ -26,6 +26,7 @@ fn connect(mut stream: TcpStream, pool: &mut ThreadPool) -> () {
             let data = String::from_utf8_lossy(&buf[..]);
             let v: Box<dyn FnMut() -> () + Send + Sync> = if data.starts_with(GET_REQUEST) {
                 Box::new(move || {
+                    std::thread::sleep_ms(5000);
                     let _ = send_response("HTTP/1.1 200 OK\r\n\r\n", "page.html", &mut stream);
                 })
             } else {
